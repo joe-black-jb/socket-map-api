@@ -4,6 +4,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type Response struct {
+	StatusCode int      `json:"statusCode"`
+	Data   interface{} `json:"data"`
+}
+
 type User struct {
 	gorm.Model
 	Name string `json:"name"`

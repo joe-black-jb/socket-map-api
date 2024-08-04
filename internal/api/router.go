@@ -10,7 +10,16 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/joe-black-jb/socket-map-api/internal"
 )
+
+func FormatResponse(c *gin.Context, statusCode int, data interface{}){
+	response := internal.Response{
+		StatusCode: statusCode,
+		Data: data,
+	}
+	c.JSON(statusCode, response)
+} 
 
 // JWT認証ミドルウェア
 func AuthMiddleware() gin.HandlerFunc {
@@ -108,7 +117,7 @@ func Router() {
 	// config.AllowOrigins = []string{"http://localhost:3000"}
 	// router.Use(cors.New(config))
 
-	// router.GET("/companies", GetCompanies)
+	router.GET("/places", GetPlaces)
 
 	// 認証が必要なエンドポイント
 	auth := router.Group("/")
