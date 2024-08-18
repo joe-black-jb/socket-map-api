@@ -14,57 +14,57 @@ import (
 var Users = []internal.User{
 	// Password: pass のハッシュ値
 	{
-		Name: "サンプルユーザ", 
-		Password: []byte("$2a$10$lbnP92Wdad2olUA18I1Xbe21Zuma6eoriPCmohCxAku8Bdzo3.SL2"), 
-		Email: "sample@sample.com",
-		Admin: false,
+		Name:     "サンプルユーザ",
+		Password: []byte("$2a$10$lbnP92Wdad2olUA18I1Xbe21Zuma6eoriPCmohCxAku8Bdzo3.SL2"),
+		Email:    "sample@sample.com",
+		Admin:    false,
 	},
 }
 
 var Places = []internal.Place{
 	{
-		Name: "カフェ・ベローチェ 京成船橋駅前店",
-		Address: "〒273-0005 千葉県船橋市本町４丁目４４−２５ ルネライラタワー船橋 １Ｆ",
-		Latitude: 35.69985840379561, 
+		Name:      "カフェ・ベローチェ 京成船橋駅前店",
+		Address:   "〒273-0005 千葉県船橋市本町４丁目４４−２５ ルネライラタワー船橋 １Ｆ",
+		Latitude:  35.69985840379561,
 		Longitude: 139.98670535289517,
 	},
 	{
-		Name: "ドトールコーヒーショップ 船橋駅南口店",
-		Address: "〒273-0005 千葉県船橋市本町１丁目３−１ 船橋FACE 1F",
-		Latitude: 35.70107504987384,
+		Name:      "ドトールコーヒーショップ 船橋駅南口店",
+		Address:   "〒273-0005 千葉県船橋市本町１丁目３−１ 船橋FACE 1F",
+		Latitude:  35.70107504987384,
 		Longitude: 139.98581438173127,
 	},
 }
 
 var Stations = []internal.Station{
 	{
-		Name: "船橋",
-		Latitude: 35.70188004983369,
+		Name:      "船橋",
+		Latitude:  35.70188004983369,
 		Longitude: 139.98537255674557,
 	},
 	{
-		Name: "東京",
-		Latitude: 35.681436611951135,
-		Longitude:  139.76708188176897,
+		Name:      "東京",
+		Latitude:  35.681436611951135,
+		Longitude: 139.76708188176897,
 	},
 	{
-		Name: "新宿",
-		Latitude: 35.69048197271755,
+		Name:      "新宿",
+		Latitude:  35.69048197271755,
 		Longitude: 139.7004371455568,
 	},
 	{
-		Name: "新船橋",
-		Latitude: 35.71185474592088,
+		Name:      "新船橋",
+		Latitude:  35.71185474592088,
 		Longitude: 139.97975498280078,
 	},
 	{
-		Name: "渋谷",
-		Latitude: 35.6581995011312,
+		Name:      "渋谷",
+		Latitude:  35.6581995011312,
 		Longitude: 139.7016143394409,
 	},
 	{
-		Name: "秋葉原",
-		Latitude: 35.698513736755125,
+		Name:      "秋葉原",
+		Latitude:  35.698513736755125,
 		Longitude: 139.77304408861374,
 	},
 	{
@@ -74,7 +74,6 @@ var Stations = []internal.Station{
 		Name: "浅草駅",
 	},
 }
-
 
 func main() {
 	enverr := godotenv.Load()

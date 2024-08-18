@@ -13,13 +13,13 @@ import (
 	"github.com/joe-black-jb/socket-map-api/internal"
 )
 
-func FormatResponse(c *gin.Context, statusCode int, data interface{}){
+func FormatResponse(c *gin.Context, statusCode int, data interface{}) {
 	response := internal.Response{
 		StatusCode: statusCode,
-		Data: data,
+		Data:       data,
 	}
 	c.JSON(statusCode, response)
-} 
+}
 
 // JWT認証ミドルウェア
 func AuthMiddleware() gin.HandlerFunc {
@@ -84,7 +84,7 @@ func Router() {
 	// trustedProxies := []string {"http://localhost:3000"}
 	// router.SetTrustedProxies(trustedProxies)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins:     []string{"http://localhost:3000", "https://socket-map.com", "https://www.socket-map.com"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Access-Control-Allow-Origin"},
 		ExposeHeaders:    []string{"Content-Length"},

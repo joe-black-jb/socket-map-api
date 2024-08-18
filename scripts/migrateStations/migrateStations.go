@@ -14,29 +14,29 @@ import (
 )
 
 type GeometryData struct {
-	Type string `json:"type"`
+	Type        string      `json:"type"`
 	Coordinates [][]float64 `json:"coordinates"`
 }
 
 type Property struct {
-	N02_001 string `json:"n02_001"`
-	N02_002 string `json:"n02_002"`
-	N02_003 string `json:"n02_003"`
-	N02_004 string `json:"n02_004"`
-	N02_005 string `json:"n02_005"`
+	N02_001  string `json:"n02_001"`
+	N02_002  string `json:"n02_002"`
+	N02_003  string `json:"n02_003"`
+	N02_004  string `json:"n02_004"`
+	N02_005  string `json:"n02_005"`
 	N02_005c string `json:"n02_005c"`
 	N02_005g string `json:"n02_005g"`
 }
 
 type Feature struct {
-	Type string `json:"type"`
-	Properties Property `json:"properties"`
-	Geometry GeometryData `json:"geometry"`
+	Type       string       `json:"type"`
+	Properties Property     `json:"properties"`
+	Geometry   GeometryData `json:"geometry"`
 }
 
 type Station struct {
-	Type string `json:"type"`
-	Name string `json:"name"`
+	Type     string    `json:"type"`
+	Name     string    `json:"name"`
 	Features []Feature `json:"features"`
 }
 
@@ -68,9 +68,7 @@ func main() {
 	var StationData Station
 	json.Unmarshal(jsonData, &StationData)
 
-	Stations := []internal.Station{}
-
-  // DB接続
+	// DB接続
 	enverr := godotenv.Load()
 	if enverr != nil {
 		log.Fatal("Error loading .env file")
@@ -88,19 +86,18 @@ func main() {
 	}
 
 	// Drop Table
-	dropErr := db.Migrator().DropTable(&internal.Station{}); if dropErr != nil {
+	dropErr := db.Migrator().DropTable(&internal.Station{})
+	if dropErr != nil {
 		fmt.Println("エラー: ", dropErr)
 	}
 
 	// Migrate the schema
-	migrationErr := db.AutoMigrate(&internal.Station{}); if migrationErr != nil {
+	migrationErr := db.AutoMigrate(&internal.Station{})
+	if migrationErr != nil {
 		fmt.Println("Migration Error: ", migrationErr)
 	}
 
-	// // Batch Create
-	// createErr := db.Create(&Stations); if createErr != nil {
-	// 	fmt.Println("Create Error: ", createErr)
-	// }
+	Stations := []internal.Station{}
 
 	// ループ処理
 	for _, feature := range StationData.Features {
@@ -110,10 +107,11 @@ func main() {
 		data.Longitude = feature.Geometry.Coordinates[0][0]
 		// 名前の重複チェック
 		isDuplicate := ContainsStation(Stations, feature.Properties.N02_005)
-		if (!isDuplicate) {
+		if !isDuplicate {
 			Stations = append(Stations, data)
 			// Batch Create
-			createErr := db.Create(&data); if createErr != nil {
+			createErr := db.Create(&data)
+			if createErr != nil {
 				fmt.Println("Create Error: ", createErr)
 			}
 		} else {
@@ -122,8 +120,29 @@ func main() {
 		}
 	}
 
+	// JSONファイル出力
+	// WriteJson("stations.json", Stations)
+
 	mysql, _ := db.DB()
 	mysql.Close()
 	fmt.Println("Done!! ⭐️")
 }
 
+func WriteJson(fileName string, stations []internal.Station) {
+	file, createFileErr := os.Create(fileName)
+	if createFileErr != nil {
+		fmt.Println("ファイル作成時エラー: ", createFileErr)
+		return
+	}
+	stationsJson, marshalErr := json.Marshal(stations)
+	if marshalErr != nil {
+		fmt.Println("ファイル解析時エラー: ", marshalErr)
+		return
+	}
+	// ファイル書き込み
+	_, writeErr := file.Write(stationsJson)
+	if writeErr != nil {
+		fmt.Println("ファイル書き込み時エラー: ", writeErr)
+		return
+	}
+}
