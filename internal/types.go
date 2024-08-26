@@ -1,7 +1,9 @@
 package internal
 
 import (
-	"gorm.io/gorm"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 type Response struct {
@@ -10,34 +12,44 @@ type Response struct {
 }
 
 type User struct {
-	gorm.Model
-	Name     string `json:"name"`
-	Email    string `gorm:"unique" json:"email"`
-	Password []byte `json:"password"`
-	Admin    bool   `json:"admin"`
+	// gorm.Model
+	ID        string    `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	Name      string    `json:"name"`
+	Email     string    `gorm:"unique" json:"email"`
+	Password  []byte    `json:"password"`
+	Admin     bool      `json:"admin"`
 }
 
 type Place struct {
-	gorm.Model
-	Name          string  `gorm:"unique" json:"name"`
-	Address       string  `json:"address"`
-	Latitude      float64 `json:"latitude"`
-	Longitude     float64 `json:"longitude"`
-	Image         string  `json:"image"`
-	BusinessHours string  `json:"businessHours"`
-	Tel           string  `json:"tel"`
-	Url           string  `json:"url"`
-	Memo          string  `json:"memo"`
-	SocketNum     int     `json:"socketNum"`
-	Wifi          int     `json:"wifi"`
-	Smoke         int     `json:"smoke"`
+	// gorm.Model
+	ID            string    `gorm:"primaryKey" json:"id"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	Name          string    `gorm:"unique" json:"name"`
+	Address       string    `json:"address"`
+	Latitude      float64   `json:"latitude"`
+	Longitude     float64   `json:"longitude"`
+	Image         string    `json:"image"`
+	BusinessHours string    `json:"businessHours"`
+	Tel           string    `json:"tel"`
+	Url           string    `json:"url"`
+	Memo          string    `json:"memo"`
+	Socket        int       `json:"socket"`
+	SocketNum     int       `json:"socketNum"`
+	Wifi          int       `json:"wifi"`
+	Smoke         int       `json:"smoke"`
 }
 
 type Station struct {
-	gorm.Model
-	Name      string  `gorm:"unique" json:"name"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
+	// gorm.Model
+	ID        string    `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	Name      string    `gorm:"unique" json:"name"`
+	Latitude  float64   `json:"latitude"`
+	Longitude float64   `json:"longitude"`
 }
 
 type Credentials struct {
@@ -71,4 +83,8 @@ type OsmPlaceDetail struct {
 	Name        string   `json:"name"`
 	DisplayName string   `json:"display_name"`
 	BoundingBox []string `json:"boundingbox"`
+}
+
+type BucketBasics struct {
+	S3Client *s3.Client
 }

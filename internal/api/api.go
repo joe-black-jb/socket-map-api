@@ -4,22 +4,69 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	// "log"
 	"net/http"
 	"net/url"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/gin-gonic/gin"
 	"github.com/joe-black-jb/socket-map-api/internal"
 	"github.com/joe-black-jb/socket-map-api/internal/database"
 )
 
-func GetPlaces(c *gin.Context) {
-	Places := &[]internal.Place{}
-	if err := database.Db.Find(Places).Error; err != nil {
-		// FormatResponse(c, http.StatusNotFound, err)
-		c.JSON(http.StatusNotFound, gin.H{"error": err})
+// func GetPlaces(c *gin.Context) {
+// 	Places := &[]internal.Place{}
+// 	if err := database.Db.Find(Places).Error; err != nil {
+// 		// FormatResponse(c, http.StatusNotFound, err)
+// 		c.JSON(http.StatusNotFound, gin.H{"error": err})
+// 	}
+// 	c.JSON(http.StatusOK, Places)
+// 	// FormatResponse(c, http.StatusOK, Places)
+// }
+
+func GetPlaces(svc *dynamodb.DynamoDB) (events.APIGatewayProxyResponse, error) {
+	fmt.Println("GetPlaces")
+
+	input := &dynamodb.ScanInput{
+		TableName: aws.String("socket_map_places"),
 	}
-	c.JSON(http.StatusOK, Places)
-	// FormatResponse(c, http.StatusOK, Places)
+	result, scanErr := svc.Scan(input)
+	if scanErr != nil {
+		fmt.Println("scan err: ", scanErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Scan Error",
+		}, scanErr
+	}
+
+	// 取得したアイテムを Place 構造体に変換
+	var places []internal.Place
+	unMarshalErr := dynamodbattribute.UnmarshalListOfMaps(result.Items, &places)
+	if unMarshalErr != nil {
+		fmt.Println("unMarshal err: ", unMarshalErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "UnMarshal Error",
+		}, unMarshalErr
+	}
+
+	// places のスライスを JSON にシリアライズ
+	body, marshalErr := json.Marshal(places)
+	if marshalErr != nil {
+		fmt.Println("failed to marshal places to json: ", marshalErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Marshal Error",
+		}, marshalErr
+	}
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+	}, nil
 }
 
 func PostPlace(c *gin.Context) {
@@ -73,10 +120,51 @@ func SearchPlace(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func GetStations(c *gin.Context) {
-	Stations := &[]internal.Station{}
-	if err := database.Db.Find(Stations).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+// func GetStations(c *gin.Context) {
+// 	Stations := &[]internal.Station{}
+// 	if err := database.Db.Find(Stations).Error; err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+// 	}
+// 	c.JSON(http.StatusOK, Stations)
+// }
+
+func GetStations(svc *dynamodb.DynamoDB) (events.APIGatewayProxyResponse, error) {
+	fmt.Println("GetStations")
+
+	input := &dynamodb.ScanInput{
+		TableName: aws.String("socket_map_stations"),
 	}
-	c.JSON(http.StatusOK, Stations)
+	result, scanErr := svc.Scan(input)
+	if scanErr != nil {
+		fmt.Println("scan err: ", scanErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Scan Error",
+		}, scanErr
+	}
+
+	// 取得したアイテムを Station 構造体に変換
+	var stations []internal.Station
+	unMarshalErr := dynamodbattribute.UnmarshalListOfMaps(result.Items, &stations)
+	if unMarshalErr != nil {
+		fmt.Println("unMarshal err: ", unMarshalErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "UnMarshal Error",
+		}, unMarshalErr
+	}
+
+	// stations のスライスを JSON にシリアライズ
+	body, marshalErr := json.Marshal(stations)
+	if marshalErr != nil {
+		fmt.Println("failed to marshal stations to json: ", marshalErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Marshal Error",
+		}, marshalErr
+	}
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+	}, nil
 }

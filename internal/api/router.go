@@ -84,7 +84,7 @@ func Router() {
 	// trustedProxies := []string {"http://localhost:3000"}
 	// router.SetTrustedProxies(trustedProxies)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "https://socket-map.com", "https://www.socket-map.com"},
+		AllowOrigins:     []string{"http://localhost:3000", "https://socket-map.com", "https://www.socket-map.com", "https://main.d3dr230uvjt1zt.amplifyapp.com"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Access-Control-Allow-Origin"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -117,10 +117,10 @@ func Router() {
 	// config.AllowOrigins = []string{"http://localhost:3000"}
 	// router.Use(cors.New(config))
 
-	router.GET("/places", GetPlaces)
+	// router.GET("/places", GetPlaces)
 	router.POST("/place", PostPlace)
 	router.GET("/search", SearchPlace)
-	router.GET("/stations", GetStations)
+	// router.GET("/stations", GetStations)
 
 	// 認証が必要なエンドポイント
 	auth := router.Group("/")
