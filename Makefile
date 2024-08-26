@@ -16,3 +16,12 @@ fmt:
 
 station:
 	$(GO) run $(STATION_APP_DIR)/$(STATION_APP_NAME).go
+
+docker:
+	sh ./scripts/deploy.sh
+
+dynamo:
+	$(GO) run ./scripts/migrateToDynamo/migrateToDynamo.go
+
+getPlaces:
+	$(GO) run ./scripts/getPlaces/getPlaces.go
