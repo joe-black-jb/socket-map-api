@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"os"
 
 	// "log"
 	"net/http"
@@ -11,11 +14,14 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/joe-black-jb/socket-map-api/internal"
-	"github.com/joe-black-jb/socket-map-api/internal/database"
 )
 
 // func GetPlaces(c *gin.Context) {
@@ -28,60 +34,163 @@ import (
 // 	// FormatResponse(c, http.StatusOK, Places)
 // }
 
-func GetPlaces(svc *dynamodb.DynamoDB) (events.APIGatewayProxyResponse, error) {
+func GetPlaces(client *dynamodb.Client) (events.APIGatewayProxyResponse, error) {
 	fmt.Println("GetPlaces")
 
-	input := &dynamodb.ScanInput{
-		TableName: aws.String("socket_map_places"),
-	}
-	result, scanErr := svc.Scan(input)
-	if scanErr != nil {
-		fmt.Println("scan err: ", scanErr)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       "Scan Error",
-		}, scanErr
-	}
-
-	// 取得したアイテムを Place 構造体に変換
 	var places []internal.Place
-	unMarshalErr := dynamodbattribute.UnmarshalListOfMaps(result.Items, &places)
-	if unMarshalErr != nil {
-		fmt.Println("unMarshal err: ", unMarshalErr)
-		return events.APIGatewayProxyResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       "UnMarshal Error",
-		}, unMarshalErr
+
+	// pagination 用
+	var lastEvaluatedKey map[string]types.AttributeValue
+
+	for {
+		scanInput := &dynamodb.ScanInput{
+			TableName: aws.String("socket_map_places"),
+		}
+		if lastEvaluatedKey != nil {
+			scanInput.ExclusiveStartKey = lastEvaluatedKey
+		}
+		result, err := client.Scan(context.TODO(), scanInput)
+		if err != nil {
+			fmt.Println("scan err: ", err)
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       "Scan Error",
+			}, err
+		}
+
+		var batch []internal.Place
+		// 取得したアイテムを Place 構造体に変換
+		err = attributevalue.UnmarshalListOfMaps(result.Items, &batch)
+		if err != nil {
+			fmt.Println("unMarshal err: ", err)
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       "UnMarshal Error",
+			}, err
+		}
+
+		places = append(places, batch...)
+
+		if result.LastEvaluatedKey == nil {
+			break
+		}
+		lastEvaluatedKey = result.LastEvaluatedKey
 	}
 
 	// places のスライスを JSON にシリアライズ
-	body, marshalErr := json.Marshal(places)
+	body, err := json.Marshal(places)
+	if err != nil {
+		fmt.Println("failed to marshal places to json: ", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Marshal Error",
+		}, err
+	}
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers: map[string]string{
+			"Content-type": "application/json",
+		},
+	}, nil
+}
+
+func GetPlacesFromCF(req events.APIGatewayProxyRequest, client *s3.Client) (events.APIGatewayProxyResponse, error) {
+	fmt.Println("GetPlacesFromS3")
+	cfDomain := os.Getenv("CF_DOMAIN")
+	if cfDomain == "" {
+		log.Fatal("CF のディストリビューションドメインが未設定です")
+	}
+	key := req.QueryStringParameters["key"]
+
+	// CF 経由で S3 からファイルを取得
+	url := fmt.Sprintf("%s/%s", cfDomain, key)
+
+	// Make the GET request
+	resp, err := http.Get(url)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "http get Error",
+		}, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "read Error",
+		}, err
+	}
+
+	var places []internal.Place
+	json.Unmarshal(body, &places)
+
+	jsonData, err := json.Marshal(places)
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(jsonData),
+		Headers: map[string]string{
+			"Content-type": "application/json",
+		},
+	}, err
+}
+
+// func PostPlace(c *gin.Context) {
+// 	var place internal.Place
+// 	if err := c.BindJSON(&place); err != nil {
+// 		fmt.Println("エラー発生❗️: ", err)
+// 		FormatResponse(c, http.StatusBadRequest, err)
+// 		return
+// 	}
+// 	fmt.Println("place⭐️: ", place)
+// 	result := database.Db.Create(&place)
+// 	fmt.Println("result ⭐️: ", result)
+// 	FormatResponse(c, http.StatusOK, place)
+// 	// fmt.Println("place.Name: ", place.Name)
+// }
+
+func PostPlace(client *dynamodb.Client, place internal.Place) (events.APIGatewayProxyResponse, error) {
+	// fmt.Println("PostPlace")
+
+	id, uuidErr := uuid.NewUUID()
+	if uuidErr != nil {
+		fmt.Println("uuid create error")
+	}
+	place.ID = id.String()
+
+	item, marshalErr := attributevalue.MarshalMap(place)
 	if marshalErr != nil {
-		fmt.Println("failed to marshal places to json: ", marshalErr)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "Marshal Error",
 		}, marshalErr
 	}
+
+	input := &dynamodb.PutItemInput{
+		TableName: aws.String("socket_map_places"),
+		Item:      item,
+	}
+	// 終わったら _ を result にする
+	result, putErr := client.PutItem(context.TODO(), input)
+	if putErr != nil {
+		fmt.Println("put err: ", putErr)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "put Error",
+		}, putErr
+	}
+	// fmt.Println("putItem result ⭐️: ", result)
+	// doneMsg := fmt.Sprintf("「%s」登録完了⭐️", place.Name)
+	doneMsg := fmt.Sprintf("「%s」result %v ⭐️", place.Name, result)
+	fmt.Println(doneMsg)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
-		Body:       string(body),
-	}, nil
-}
-
-func PostPlace(c *gin.Context) {
-	var place internal.Place
-	if err := c.BindJSON(&place); err != nil {
-		fmt.Println("エラー発生❗️: ", err)
-		FormatResponse(c, http.StatusBadRequest, err)
-		return
-	}
-	fmt.Println("place⭐️: ", place)
-	result := database.Db.Create(&place)
-	fmt.Println("result ⭐️: ", result)
-	FormatResponse(c, http.StatusOK, place)
-	// fmt.Println("place.Name: ", place.Name)
-
+		Body:       "OK",
+	}, putErr
 }
 
 func SearchPlace(c *gin.Context) {
@@ -128,24 +237,27 @@ func SearchPlace(c *gin.Context) {
 // 	c.JSON(http.StatusOK, Stations)
 // }
 
-func GetStations(svc *dynamodb.DynamoDB) (events.APIGatewayProxyResponse, error) {
+func GetStations(client *dynamodb.Client) (events.APIGatewayProxyResponse, error) {
 	fmt.Println("GetStations")
 
 	input := &dynamodb.ScanInput{
 		TableName: aws.String("socket_map_stations"),
 	}
-	result, scanErr := svc.Scan(input)
+	result, scanErr := client.Scan(context.TODO(), input)
 	if scanErr != nil {
 		fmt.Println("scan err: ", scanErr)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       "Scan Error",
+			Headers: map[string]string{
+				"Content-type": "application/json",
+			},
 		}, scanErr
 	}
 
 	// 取得したアイテムを Station 構造体に変換
 	var stations []internal.Station
-	unMarshalErr := dynamodbattribute.UnmarshalListOfMaps(result.Items, &stations)
+	unMarshalErr := attributevalue.UnmarshalListOfMaps(result.Items, &stations)
 	if unMarshalErr != nil {
 		fmt.Println("unMarshal err: ", unMarshalErr)
 		return events.APIGatewayProxyResponse{
