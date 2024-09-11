@@ -8,19 +8,28 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 	"github.com/joe-black-jb/socket-map-api/internal"
+	"github.com/joe-black-jb/socket-map-api/internal/api"
 	"github.com/joho/godotenv"
 	"golang.org/x/net/html"
 	"googlemaps.github.io/maps"
 )
 
 var Env = os.Getenv("ENV")
+
+var dynamoClient *dynamodb.Client
+
+func init() {
+	cfg, cfgErr := config.LoadDefaultConfig(context.TODO())
+	if cfgErr != nil {
+		fmt.Println("Load default config error: %v", cfgErr)
+		return
+	}
+	dynamoClient = dynamodb.NewFromConfig(cfg)
+}
 
 func main() {
 
@@ -40,18 +49,6 @@ func main() {
 		if clientErr != nil {
 			log.Fatal("cErr: ", clientErr)
 		}
-		// Create DynamoDB session
-		accessKey := os.Getenv("ACCESS_KEY")
-		secretAccessKey := os.Getenv("SECRET_ACCESS_KEY")
-		sess := session.Must(session.NewSession(&aws.Config{
-			Region: aws.String("ap-northeast-1"),
-			Credentials: credentials.NewStaticCredentials(
-				accessKey,
-				secretAccessKey,
-				"",
-			),
-		}))
-		svc := dynamodb.New(sess)
 		// Get HTML
 		for i := 2; i <= 178; i++ {
 			url := fmt.Sprintf("https://www.justnoles.com/page/%d/?search_keywords&search_keywords_operator=and&search_cat2=2087&search_cat3=0", i)
@@ -81,7 +78,7 @@ func main() {
 			for _, shopName := range shopNames {
 				closed := strings.Contains(shopName, "【閉店】")
 				if !closed {
-					GetPlacesFromGoogle(svc, client, shopName)
+					GetPlacesFromGoogle(dynamoClient, client, shopName)
 				}
 			}
 		}
@@ -136,7 +133,7 @@ func findTitle(node *html.Node, shops []string) []string {
 	return shops
 }
 
-func GetPlacesFromGoogle(svc *dynamodb.DynamoDB, client *maps.Client, shopName string) {
+func GetPlacesFromGoogle(dynamoClient *dynamodb.Client, client *maps.Client, shopName string) {
 	// fmt.Println("GetPlacesFromGoogle start ⭐️")
 
 	r := &maps.TextSearchRequest{
@@ -168,20 +165,9 @@ func GetPlacesFromGoogle(svc *dynamodb.DynamoDB, client *maps.Client, shopName s
 	place.Longitude = result.Geometry.Location.Lng
 	place.Socket = 1
 
-	av, err := dynamodbattribute.MarshalMap(place)
+	postPlace, err := api.PostPlace(dynamoClient, place)
 	if err != nil {
 		log.Fatalf("failed to marshal place: %v", err)
 	}
-	// Dynamo テーブルに値を追加
-	_, putErr := svc.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String("socket_map_places"),
-		Item:      av,
-	})
-
-	if putErr != nil {
-		fmt.Println("put Error: ", putErr)
-		return
-	}
-	successMsg := fmt.Sprintf("「%s」追加完了", place.Name)
-	fmt.Println(successMsg)
+	fmt.Println(fmt.Sprintf("「%s」登録完了 ⭐️: %v", place.Name, postPlace))
 }
