@@ -10,23 +10,39 @@ import (
 	// "github.com/joe-black-jb/socket-map-api/internal/database"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // DynamoDB との接続
 // Init() で実行することで、1つのLambdaにつき1度のみ接続処理を実行する
-var svc *dynamodb.DynamoDB
+// var svc *dynamodb.DynamoDB
+var dynamoClient *dynamodb.Client
+
+var s3Client *s3.Client
 
 func init() {
 	fmt.Println("Init")
-	sess := session.Must(session.NewSession())
-	svc = dynamodb.New(sess)
+	// v1
+	// sess := session.Must(session.NewSession())
+	// svc = dynamodb.New(sess)
+
+	// v2
+	cfg, cfgErr := config.LoadDefaultConfig(context.TODO())
+	if cfgErr != nil {
+		fmt.Println("Load default config error: %v", cfgErr)
+		return
+	}
+	dynamoClient = dynamodb.NewFromConfig(cfg)
+
+	s3Client = s3.NewFromConfig(cfg)
 }
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fmt.Printf("Received request: %v\n", request)
 	path := request.PathParameters["path"]
+	key := request.QueryStringParameters["key"]
 	fmt.Println("path: ", path)
 	fmt.Println("request.Headers: ", request.Headers)
 
@@ -45,11 +61,22 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	// Routing
 	switch path {
 	case "places":
-		fmt.Println("places route svc: ", svc)
-		return api.GetPlaces(svc)
+		if key != "" {
+			fmt.Println("places route with key: ", key)
+			return api.GetPlacesFromCF(request, s3Client)
+		}
+		fmt.Println("places route dynamoClient: ", dynamoClient)
+		return api.GetPlaces(dynamoClient)
 	case "stations":
-		fmt.Println("stations route svc: ", svc)
-		return api.GetStations(svc)
+		if key != "" {
+			fmt.Println("stations route with key: ", key)
+			return api.GetPlacesFromCF(request, s3Client)
+		}
+		fmt.Println("stations route dynamoClient: ", dynamoClient)
+		return api.GetStations(dynamoClient)
+	// case "places-cf":
+	// 	fmt.Println("stations route dynamoClient: ", dynamoClient)
+	// 	return api.GetPlacesFromCF(request, s3Client)
 	default:
 		fmt.Println("default")
 	}
