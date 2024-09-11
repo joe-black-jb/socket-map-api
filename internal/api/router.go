@@ -118,7 +118,7 @@ func Router() {
 	// router.Use(cors.New(config))
 
 	// router.GET("/places", GetPlaces)
-	router.POST("/place", PostPlace)
+	// router.POST("/place", PostPlace)
 	router.GET("/search", SearchPlace)
 	// router.GET("/stations", GetStations)
 
