@@ -1,3 +1,5 @@
+.PHONY: zip terraform localstack lint fmt
+
 # 変数
 GO := go
 APP_DIR := ./scripts
@@ -18,7 +20,7 @@ station:
 	$(GO) run $(STATION_APP_DIR)/$(STATION_APP_NAME).go
 
 deploy:
-	sh ./scripts/deploy.sh
+	sh ./scripts/deploy.sh $(TARGET)
 
 dynamo:
 	$(GO) run ./scripts/migrateToDynamo/migrateToDynamo.go
@@ -37,3 +39,26 @@ starbucks:
 
 writePlaces:
 	$(GO) run ./scripts/writePlacesJson/writePlacesJson.go
+
+localstack:
+	@docker-compose up -d
+
+down:
+	@docker-compose down
+
+start:
+	@docker-compose start
+
+stop:
+	@docker-compose stop
+
+zip:
+	@GOOS=linux GOARCH=amd64 go build -o terraform/localstack/main cmd/socket-map-api/main.go
+	@zip terraform/localstack/main.zip terraform/localstack/main
+	@rm terraform/localstack/main
+
+terraform:
+	@tflocal -chdir=terraform/localStack init
+	@tflocal -chdir=terraform/localStack apply --auto-approve
+
+
