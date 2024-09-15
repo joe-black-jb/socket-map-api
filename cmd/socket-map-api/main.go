@@ -77,6 +77,9 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	// case "places-cf":
 	// 	fmt.Println("stations route dynamoClient: ", dynamoClient)
 	// 	return api.GetPlacesFromCF(request, s3Client)
+	case "places-bounds":
+		fmt.Println("places-bounds route dynamoClient: ", dynamoClient)
+		return api.GetPlacesWithBounds(request, dynamoClient)
 	default:
 		fmt.Println("default")
 	}

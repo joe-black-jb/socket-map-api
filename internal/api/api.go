@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 
 	// "log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
@@ -278,5 +280,96 @@ func GetStations(client *dynamodb.Client) (events.APIGatewayProxyResponse, error
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Body:       string(body),
+	}, nil
+}
+
+func GetPlacesWithBounds(req events.APIGatewayProxyRequest, client *dynamodb.Client)(events.APIGatewayProxyResponse, error){
+	latMin, err := strconv.ParseFloat(req.QueryStringParameters["lat_min"], 64)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       "invalid parameter",
+		}, nil
+	}
+	latMax, err := strconv.ParseFloat(req.QueryStringParameters["lat_max"], 64)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       "invalid parameter",
+		}, nil
+	}
+	lngMin, err := strconv.ParseFloat(req.QueryStringParameters["lng_min"], 64)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       "invalid parameter",
+		}, nil
+	}
+	lngMax, err := strconv.ParseFloat(req.QueryStringParameters["lng_max"], 64)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       "invalid parameter",
+		}, nil
+	}
+
+	fmt.Println("query: ", req.QueryStringParameters)
+
+	var response *dynamodb.ScanOutput
+
+	var places []internal.Place
+
+	latCondition := expression.Name("latitude").Between(expression.Value(latMin), expression.Value(latMax))
+	lngCondition := expression.Name("longitude").Between(expression.Value(lngMin), expression.Value(lngMax))
+	filtEx := expression.And(latCondition, lngCondition)
+
+	expr, err := expression.NewBuilder().WithFilter(filtEx).Build()
+	if err != nil {
+		fmt.Println("expression build err: ", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "expression build err",
+		}, err
+	}
+
+	scanPaginator := dynamodb.NewScanPaginator(client, &dynamodb.ScanInput{
+		TableName:                 aws.String("socket_map_places"),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		FilterExpression:          expr.Filter(),
+		// ProjectionExpression:      expr.Projection(),
+	})
+	for scanPaginator.HasMorePages() {
+		response, err = scanPaginator.NextPage(context.TODO())
+		if err != nil {
+			log.Printf("Couldn't scan for movies released between %v and %v. Here's why: %v\n", latMin, latMax, err)
+			break
+		} else {
+			var placePage []internal.Place
+			err = attributevalue.UnmarshalListOfMaps(response.Items, &placePage)
+			if err != nil {
+				log.Printf("Couldn't unmarshal query response. Here's why: %v\n", err)
+				break
+			} else {
+				places = append(places, placePage...)
+			}
+		}
+	}
+	body, err := json.Marshal(places)
+	if err != nil {
+		fmt.Println("failed to marshal places to json: ", err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       "Marshal Error",
+		}, err
+	}
+	fmt.Println("len(places): ", len(places))
+	fmt.Println("body string: ", string(body))
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(body),
+		Headers: map[string]string{
+			"Content-type": "application/json",
+		},
 	}, nil
 }
