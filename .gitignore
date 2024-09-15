@@ -3,7 +3,10 @@
 /db-data
 /seeder
 /volume*
-/terraform/localStack/main*
+/terraform/localStack/main
+/terraform/localStack/main.zip
 *.tfvars
 *tfstate*
 *.terraform
+result.log
+/localstack-data
